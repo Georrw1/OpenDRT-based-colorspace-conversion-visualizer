@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenDRT v1.1.0 · 以图像为中心的色彩管理可视化</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #ddd;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #panel {
+      width: 300px;
+      flex: 0 0 300px;
+      padding: 16px;
+      background: #202020;
+      border-right: 1px solid #333;
+      overflow-y: auto;
+    }
+    .group { margin-bottom: 20px; }
+    .group > h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6cf;
+      margin: 0 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #333;
+    }
+    #panel .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    #panel .field > span { color: #aaa; }
+    #panel .field > b { color: #6cf; font-weight: 600; }
+    #panel select, #panel input[type=range] { width: 100%; }
+    /* 分组参数 */
+    #panel details.param-group {
+      border: 1px solid #333;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      background: #1c1c1c;
+    }
+    #panel details.param-group > summary {
+      cursor: pointer;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #ddd;
+      list-style: none;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+    }
+    #panel details.param-group[open] > summary { border-bottom-color: #333; }
+    #panel details.param-group > summary::-webkit-details-marker { display: none; }
+    #panel details.param-group > summary::before { content: "▸ "; color: #6cf; }
+    #panel details.param-group[open] > summary::before { content: "▾ "; }
+    #panel details.param-group > * { margin-left: 10px; margin-right: 10px; }
+    #panel details.param-group > summary { margin-left: 0; margin-right: 0; }
+    #panel .group-desc { color: #777; font-size: 11px; margin: 8px 10px 4px; line-height: 1.4; }
+    #panel .field-toggle {
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    #panel .field-toggle > input { width: auto; }
+    #panel .field-toggle > span { color: #cfc; font-size: 12px; }
+    #panel .field-slider { margin-bottom: 10px; }
+    #panel select {
+      background: #2a2a2a;
+      color: #ddd;
+      border: 1px solid #444;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    #upload-btn {
+      display: block;
+      width: 100%;
+      background: #2a3a4a;
+      color: #cfe6ff;
+      border: 1px solid #3a5a7a;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      font-size: 13px;
+    }
+    #upload-btn:hover { background: #34485c; }
+    #img-info { color: #999; font-size: 12px; margin-top: 8px; line-height: 1.5; }
+    .note { color: #888; font-size: 12px; line-height: 1.5; }
+
+    #main {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #tabs {
+      display: flex;
+      gap: 4px;
+      padding: 8px 8px 0;
+      background: #202020;
+      border-bottom: 1px solid #333;
+      align-items: flex-end;
+    }
+    .tab {
+      background: #2a2a2a;
+      color: #bbb;
+      border: 1px solid #444;
+      border-bottom: none;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      font-size: 13px;
+    }
+    .tab.active { background: #1a1a1a; color: #6cf; }
+    #cie-controls { margin-left: auto; padding-bottom: 6px; font-size: 12px; color: #aaa; }
+    #cie-controls select {
+      background: #2a2a2a; color: #ddd; border: 1px solid #444;
+      padding: 3px; border-radius: 4px; margin-left: 6px;
+    }
+
+    #views {
+      flex: 1 1 auto;
+      overflow: auto;
+      padding: 16px;
+    }
+    #errbox {
+      display: none;
+      background: #402020;
+      color: #f88;
+      border: 1px solid #603030;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+    #view-cie, #view-regression, #view-curves, #view-dag, #view-gamut3d, #image-wrap { display: none; }
+    #view-gamut3d { gap: 16px; align-items: flex-start; }
+    #g3d-canvas-wrap { flex: 1 1 auto; border: 1px solid #2a2a2e; border-radius: 6px; background: #08080a; overflow: hidden; }
+    #gamut3d-canvas { width: 100%; height: 70vh; display: block; cursor: grab; }
+    #gamut3d-canvas:active { cursor: grabbing; }
+    #g3d-legend { flex: 0 0 220px; background: #17171a; border: 1px solid #2a2a2e; border-radius: 6px; padding: 12px 14px; font-size: 12px; color: #c8c8d0; line-height: 1.7; }
+    #g3d-legend h4 { margin: 0 0 8px; color: #6cf; font-size: 13px; }
+    #g3d-legend .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 6px; vertical-align: middle; border: 1px solid #444; }
+    #g3d-legend .hint { color: #888; font-size: 11px; margin-top: 10px; line-height: 1.5; }
+
+    /* 图像预览容器:WebGL canvas 之上叠加一层透明 2D canvas 画十字准星(像素探针)。 */
+    #image-wrap { position: relative; display: inline-block; }
+    /* 叠加层必须透明背景,否则全局 canvas{background:#111} 会挡住下方图像预览 → 黑屏。 */
+    #probe-overlay { position: absolute; left: 0; top: 0; pointer-events: none; background: transparent; }
+
+    /* DAG 流程图:左侧节点图(可滚动) + 右侧信息面板。 */
+    #view-dag { display: flex; gap: 16px; align-items: flex-start; }
+    #dag-canvas-wrap { flex: 0 0 auto; max-height: calc(100vh - 140px); overflow-y: auto; border: 1px solid #2a2a2e; }
+    #dag-right { flex: 1 1 auto; min-width: 320px; display: flex; flex-direction: column; gap: 14px; }
+    #dag-image-box { background: #0e0e10; border: 1px solid #2a2a2e; border-radius: 6px; padding: 12px; }
+    #dag-image-title { color: #8a8a92; font-size: 12px; margin-bottom: 8px; }
+    #dag-image { width: 100%; height: auto; image-rendering: auto; background: #000; border: 1px solid #2a2a2e; display: block; }
+    #dag-info { background: #17171a; border: 1px solid #2a2a2e; border-radius: 6px; padding: 14px; font-size: 13px; }
+    #dag-info h3 { margin-top: 0; color: #6cf; }
+    #dag-info table { margin-top: 6px; }
+    /* 公式 + 原理讲解区 */
+    .formula-block {
+      background: #101014; border: 1px solid #2a2a2e; border-radius: 5px;
+      padding: 10px 12px; margin: 10px 0; overflow-x: auto;
+    }
+    .formula-block .katex { font-size: 1.02em; color: #e6e6ea; }
+    .formula-block .katex-display { margin: 6px 0; }
+    .section-label { color: #6cf; font-size: 11px; font-weight: 600; letter-spacing: .04em;
+      text-transform: uppercase; margin: 12px 0 4px; }
+    .theory-text { color: #c8c8d0; font-size: 12.5px; line-height: 1.65; }
+    .theory-text b { color: #ffd27f; font-weight: 600; }
+    .theory-text i { color: #9fd0ff; font-style: normal; }
+    .vars-note { color: #7a7a85; font-size: 11px; line-height: 1.5; margin-top: 6px; font-family: monospace; }
+    #probe-info { color: #999; font-size: 12px; margin-top: 8px; line-height: 1.5; }
+
+    .banner {
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .banner.pass { background: #143d14; color: #7fdf7f; border: 1px solid #2a6a2a; }
+    .banner.fail { background: #3d1414; color: #ff8080; border: 1px solid #6a2a2a; }
+    p.fail { color: #ff8080; }
+    p.pass { color: #7fdf7f; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+      font-family: monospace;
+      margin-bottom: 24px;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 4px 8px;
+      text-align: left;
+    }
+    th { background: #252525; color: #aaa; }
+    tr.fail td { background: #2a1414; color: #ff9090; }
+    h3 { color: #ccc; font-size: 14px; margin: 16px 0 8px; }
+
+    canvas { background: #111; max-width: 100%; }
+    #view-cie { width: 720px; height: 720px; }
+
+    #footer {
+      padding: 6px 16px;
+      background: #202020;
+      border-top: 1px solid #2a2a2a;
+      font-size: 11px;
+      color: #555;
+      text-align: right;
+    }
+    #footer a { color: #556; text-decoration: none; cursor: pointer; }
+    #footer a:hover { color: #88a; }
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <aside id="panel">
+    <div class="group">
+      <h2>① 图像</h2>
+      <label id="upload-btn">
+        上传图像 (PNG / JPG / EXR)
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.exr,image/*" hidden />
+      </label>
+      <div id="img-info"></div>
+    </div>
+    <div class="group">
+      <h2>② 源色彩空间</h2>
+      <div id="panel-source"></div>
+    </div>
+    <div class="group">
+      <h2>③ OpenDRT</h2>
+      <div id="panel-opendrt"></div>
+    </div>
+  </aside>
+  <div id="main">
+    <nav id="tabs">
+      <button class="tab" data-tab="image">图像预览</button>
+      <button class="tab" data-tab="cie">CIE 色度图</button>
+      <button class="tab" data-tab="curves">曲线</button>
+      <button class="tab" data-tab="dag">流程图(DAG)</button>
+      <button class="tab" data-tab="gamut3d">3D 色域</button>
+      <span id="g3d-controls" style="display:none;">
+        点云
+        <select id="g3d-mode">
+          <option value="both">clip vs tonemap 对比</option>
+          <option value="clip">仅 clip(原始 linear 钳制)</option>
+          <option value="tonemap">仅 tonemap(过 OpenDRT)</option>
+          <option value="raw">仅 raw(不钳不压真实延伸)</option>
+        </select>
+        <label style="margin-left:10px;"><input type="checkbox" id="g3d-hull" checked> 色域线框</label>
+        <label style="margin-left:10px;"><input type="checkbox" id="g3d-ptw" checked> path to white</label>
+      </span>
+      <span id="cie-controls" style="display:none;">
+        显示
+        <select id="cie-mode">
+          <option value="shift">位移连线(推荐)</option>
+          <option value="both">前后叠加</option>
+          <option value="input">仅处理前</option>
+          <option value="output">仅处理后</option>
+        </select>
+        <label style="margin-left:10px;"><input type="checkbox" id="cie-ptw"> path-to-white</label>
+      </span>
+    </nav>
+    <div id="views">
+      <div id="errbox"></div>
+      <div id="view-regression"></div>
+      <canvas id="view-cie" width="720" height="720"></canvas>
+      <div id="image-wrap">
+        <canvas id="view-image"></canvas>
+        <canvas id="probe-overlay"></canvas>
+      </div>
+      <canvas id="view-curves" width="900" height="760"></canvas>
+      <div id="view-gamut3d">
+        <div id="g3d-canvas-wrap"><canvas id="gamut3d-canvas"></canvas></div>
+        <div id="g3d-legend"></div>
+      </div>
+      <div id="view-dag">
+        <div id="dag-canvas-wrap"><canvas id="dag-canvas" width="420"></canvas></div>
+        <div id="dag-right">
+          <div id="dag-image-box">
+            <div id="dag-image-title">整图中间态 · 点击左侧节点查看该步骤后的整张图</div>
+            <canvas id="dag-image" width="480" height="270"></canvas>
+          </div>
+          <div id="dag-info">
+            <p class="note">悬浮或点击左侧节点查看详情。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="footer">
+      <span id="probe-info"></span>
+      <a id="dev-link">开发者 / 回归校验</a>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
