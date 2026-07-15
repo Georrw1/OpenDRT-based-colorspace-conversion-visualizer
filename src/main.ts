@@ -16,6 +16,7 @@ import { renderCurves } from "./views/curves";
 import { renderDag, renderDagInfoPanel, hitTestNode, computeProbeTrace, renderNodeImage, DAG_IMG_MAX, type DagState } from "./views/dagFlow";
 import { loadImageFile, syntheticSource, decodeSceneLinear, type LoadedSource } from "./io/loadImage";
 import { updateGamut3d, resizeGamut3d, gamut3dLegendHtml, type G3dMode } from "./views/gamut3d";
+import { exportNativeResolutionImage, exportCube, exportOcioBundle } from "./io/exportUtils";
 
 type Tab = "image" | "cie" | "regression" | "curves" | "dag" | "gamut3d";
 
@@ -57,6 +58,11 @@ const probeInfo = document.getElementById("probe-info")!;
 const cieControls = document.getElementById("cie-controls")!;
 const cieModeSel = document.getElementById("cie-mode") as HTMLSelectElement;
 const ciePtwChk = document.getElementById("cie-ptw") as HTMLInputElement;
+const imageControls = document.getElementById("image-controls")!;
+const exportImgBtn = document.getElementById("export-img-btn") as HTMLButtonElement;
+const lutSizeSel = document.getElementById("lut-size-sel") as HTMLSelectElement;
+const exportCubeBtn = document.getElementById("export-cube-btn") as HTMLButtonElement;
+const exportOcioBtn = document.getElementById("export-ocio-btn") as HTMLButtonElement;
 const devLink = document.getElementById("dev-link")!;
 
 let glctx: GLContext | null = null;
@@ -105,6 +111,7 @@ function showTab(tab: Tab) {
   gamut3dViewDiv.style.display = tab === "gamut3d" ? "flex" : "none";
   cieControls.style.display = tab === "cie" ? "inline" : "none";
   g3dControls.style.display = tab === "gamut3d" ? "inline" : "none";
+  imageControls.style.display = tab === "image" ? "inline" : "none";
   for (const btn of document.querySelectorAll<HTMLButtonElement>(".tab")) {
     btn.classList.toggle("active", btn.dataset.tab === tab);
   }
@@ -345,6 +352,46 @@ dagCanvas.addEventListener("click", (ev) => {
 for (const btn of document.querySelectorAll<HTMLButtonElement>(".tab")) {
   btn.addEventListener("click", () => showTab(btn.dataset.tab as Tab));
 }
+
+// 导出功能
+exportImgBtn.addEventListener("click", async () => {
+  const oldText = exportImgBtn.textContent;
+  exportImgBtn.textContent = "正在导出...";
+  exportImgBtn.disabled = true;
+  try {
+    await exportNativeResolutionImage(source, params, (p) => {
+      exportImgBtn.textContent = `正在导出... ${Math.round(p * 100)}%`;
+    });
+  } catch (e) {
+    alert(`导出失败: ${(e as Error).message}`);
+  }
+  exportImgBtn.textContent = oldText;
+  exportImgBtn.disabled = false;
+});
+
+exportCubeBtn.addEventListener("click", async () => {
+  const size = parseInt(lutSizeSel.value, 10);
+  const oldText = exportCubeBtn.textContent;
+  exportCubeBtn.textContent = "正在生成 LUT...";
+  exportCubeBtn.disabled = true;
+  await exportCube(params, size, (p) => {
+    exportCubeBtn.textContent = `正在生成 LUT... ${Math.round(p * 100)}%`;
+  });
+  exportCubeBtn.textContent = oldText;
+  exportCubeBtn.disabled = false;
+});
+
+exportOcioBtn.addEventListener("click", async () => {
+  const size = parseInt(lutSizeSel.value, 10);
+  const oldText = exportOcioBtn.textContent;
+  exportOcioBtn.textContent = "正在打包 OCIO...";
+  exportOcioBtn.disabled = true;
+  await exportOcioBundle(params, size, (p) => {
+    exportOcioBtn.textContent = `正在打包 OCIO... ${Math.round(p * 100)}%`;
+  });
+  exportOcioBtn.textContent = oldText;
+  exportOcioBtn.disabled = false;
+});
 
 devLink.addEventListener("click", () => {
   location.hash = "regression";

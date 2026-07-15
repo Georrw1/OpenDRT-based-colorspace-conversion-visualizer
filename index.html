@@ -250,6 +250,18 @@
       <h2>③ OpenDRT</h2>
       <div id="panel-opendrt"></div>
     </div>
+    <div class="group" id="export-group">
+      <h2>④ 导出配置</h2>
+      <div class="field">
+        <span>LUT 精度</span>
+        <select id="lut-size-sel">
+          <option value="33">33 (默认)</option>
+          <option value="65">65</option>
+        </select>
+      </div>
+      <button id="export-cube-btn" style="width: 100%; margin-bottom: 8px; background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 10px; border-radius: 6px; cursor: pointer;">导出 3D LUT (.cube)</button>
+      <button id="export-ocio-btn" style="width: 100%; background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 10px; border-radius: 6px; cursor: pointer;">导出 OCIO 打包 (.zip)</button>
+    </div>
   </aside>
   <div id="main">
     <nav id="tabs">
@@ -278,6 +290,9 @@
           <option value="output">仅处理后</option>
         </select>
         <label style="margin-left:10px;"><input type="checkbox" id="cie-ptw"> path-to-white</label>
+      </span>
+      <span id="image-controls" style="display:none; margin-left: auto; padding-bottom: 6px;">
+        <button id="export-img-btn" style="background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">导出当前图像 (PNG)</button>
       </span>
     </nav>
     <div id="views">
