@@ -286,7 +286,16 @@
         <label style="margin-left:10px;"><input type="checkbox" id="g3d-hull" checked> <span data-i18n="g3d.hull">色域线框</span></label>
         <label style="margin-left:10px;"><input type="checkbox" id="g3d-ptw" checked> <span data-i18n="g3d.ptw">path to white</span></label>
       </span>
-      <span id="cie-controls" style="display:none;">
+      <span id="curves-controls" style="display:none; margin-left: auto; padding-bottom: 6px; font-size: 12px; color: #aaa;">
+        <span data-i18n="curves.mode">曲线模式</span>
+        <select id="curves-mode" style="background: #2a2a2a; color: #ddd; border: 1px solid #444; padding: 3px; border-radius: 4px; margin-left: 6px;">
+          <option value="tonescale_purity" data-i18n="curves.mode.tp">Tonescale & Purity</option>
+          <option value="hue_shift" data-i18n="curves.mode.hue">Hue Shift 色相偏移</option>
+          <option value="brilliance" data-i18n="curves.mode.brilliance">Brilliance 明亮度</option>
+          <option value="transfer" data-i18n="curves.mode.transfer">Transfer OETF/EOTF</option>
+        </select>
+      </span>
+      <span id="cie-controls" style="display:none; margin-left: auto; padding-bottom: 6px; font-size: 12px; color: #aaa;">
         <span data-i18n="cie.display">显示</span>
         <select id="cie-mode">
           <option value="shift" data-i18n="cie.mode.shift">位移连线(推荐)</option>
@@ -308,7 +317,14 @@
         <canvas id="view-image"></canvas>
         <canvas id="probe-overlay"></canvas>
       </div>
-      <canvas id="view-curves" width="900" height="760"></canvas>
+      <div id="view-curves" style="display: none; flex-direction: column; gap: 16px;">
+      <div style="flex: 0 0 auto; background: #0e0e10; border: 1px solid #2a2a2e; border-radius: 6px; padding: 16px; display: flex; justify-content: center; overflow-x: auto;">
+        <canvas id="curves-canvas" width="900" height="700" style="display: block; max-width: 100%; height: auto; background: transparent;"></canvas>
+      </div>
+      <div id="curves-formula" class="formula-block" style="flex: 0 0 auto; margin: 0; background: #17171a;">
+        <!-- Formulas will be injected here -->
+      </div>
+    </div>
       <div id="view-gamut3d">
         <div id="g3d-canvas-wrap"><canvas id="gamut3d-canvas"></canvas></div>
         <div id="g3d-legend"></div>

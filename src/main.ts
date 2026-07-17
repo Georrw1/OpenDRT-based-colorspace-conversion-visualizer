@@ -39,7 +39,8 @@ const cieCanvas = document.getElementById("view-cie") as HTMLCanvasElement;
 const imageWrap = document.getElementById("image-wrap")!;
 const glCanvas = document.getElementById("view-image") as HTMLCanvasElement;
 const probeOverlay = document.getElementById("probe-overlay") as HTMLCanvasElement;
-const curvesCanvas = document.getElementById("view-curves") as HTMLCanvasElement;
+const curvesViewDiv = document.getElementById("view-curves")!;
+const curvesCanvas = document.getElementById("curves-canvas") as HTMLCanvasElement;
 const dagViewDiv = document.getElementById("view-dag")!;
 const dagCanvas = document.getElementById("dag-canvas") as HTMLCanvasElement;
 const dagImage = document.getElementById("dag-image") as HTMLCanvasElement;
@@ -59,6 +60,9 @@ const probeInfo = document.getElementById("probe-info")!;
 const cieControls = document.getElementById("cie-controls")!;
 const cieModeSel = document.getElementById("cie-mode") as HTMLSelectElement;
 const ciePtwChk = document.getElementById("cie-ptw") as HTMLInputElement;
+const curvesControls = document.getElementById("curves-controls")!;
+const curvesModeSel = document.getElementById("curves-mode") as HTMLSelectElement;
+let curvesMode: any = "tonescale_purity";
 const imageControls = document.getElementById("image-controls")!;
 const exportImgBtn = document.getElementById("export-img-btn") as HTMLButtonElement;
 const lutSizeSel = document.getElementById("lut-size-sel") as HTMLSelectElement;
@@ -107,10 +111,11 @@ function showTab(tab: Tab) {
   regDiv.style.display = tab === "regression" ? "block" : "none";
   cieCanvas.style.display = tab === "cie" ? "block" : "none";
   imageWrap.style.display = tab === "image" ? "inline-block" : "none";
-  curvesCanvas.style.display = tab === "curves" ? "block" : "none";
+  curvesViewDiv.style.display = tab === "curves" ? "flex" : "none";
   dagViewDiv.style.display = tab === "dag" ? "flex" : "none";
   gamut3dViewDiv.style.display = tab === "gamut3d" ? "flex" : "none";
   cieControls.style.display = tab === "cie" ? "inline" : "none";
+  curvesControls.style.display = tab === "curves" ? "inline" : "none";
   g3dControls.style.display = tab === "gamut3d" ? "inline" : "none";
   imageControls.style.display = tab === "image" ? "inline" : "none";
   for (const btn of document.querySelectorAll<HTMLButtonElement>(".tab")) {
@@ -213,7 +218,7 @@ function rerender() {
   } else if (activeTab === "cie") {
     renderCie(cieCanvas, params, source, { mode: cieMode, showPtw: ciePtw });
   } else if (activeTab === "curves") {
-    renderCurves(curvesCanvas, params);
+    renderCurves(curvesCanvas, params, curvesMode, probePixel);
   } else if (activeTab === "dag") {
     rerenderDag();
   } else if (activeTab === "gamut3d") {
@@ -259,6 +264,11 @@ fileInput.addEventListener("change", async () => {
 cieModeSel.addEventListener("change", () => {
   cieMode = cieModeSel.value as CieScatterMode;
   if (activeTab === "cie") rerender();
+});
+
+curvesModeSel.addEventListener("change", () => {
+  curvesMode = curvesModeSel.value;
+  if (activeTab === "curves") rerender();
 });
 
 // 3D 色域:复用「整图中间态」的降采样缓存做点云采样源(scene-linear,输入色域)。
@@ -397,7 +407,7 @@ function rerenderAllComponents() {
     renderImage(glCanvas, pass, params, source);
   }
   renderCie(cieCanvas, params, source, { mode: cieMode, showPtw: ciePtw });
-  renderCurves(curvesCanvas, params);
+  renderCurves(curvesCanvas, params, curvesMode, probePixel);
   rerenderDag();
   rerenderGamut3d();
 }
