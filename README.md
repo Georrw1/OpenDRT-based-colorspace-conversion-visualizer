@@ -25,7 +25,8 @@ At the foundational level, this project strictly adheres to the **official origi
 - **Hybrid OCIO 2.0 Config Generation**: Dynamically bundles and generates OCIO 2.0 configurations. It not only registers the custom OpenDRT transform as the default View but also integrates complex ColorSpace and Roles settings required by industrial DCC software (Nuke, Mari, Substance Painter), ensuring seamless pipeline integration.
 - **Node Flowchart (DAG) & Pixel Probe**: Click node by node to view the state of color flow, combined with KaTeX formula rendering to show the exact mathematical operations corresponding to the kernel. Provides a highly accurate single-pixel RGB input/output probe.
 - **Multi-Dimensional Visualization**:
-  - **2D CIE 1931 Chromaticity Diagram**: Displays the scatter distribution of source and target pixels and their convergence towards the D65 white point.
+  - **2D CIE 1931 Chromaticity Diagram**: Displays the scatter distribution of source and target pixels and their convergence towards the D65 white point. High-resolution spectral locus boundary.
+  - **Curves / Mathematical Oscilloscope**: Dynamic mathematical plotting including Tonescale, Hue Shift (split into RGB components), Brilliance, and OETF/EOTF Transfer functions. Features a real-time pixel probe projection and dynamic LaTeX formula panel.
   - **3D Gamut Volume (Three.js)**: Supports Clip, Tonemap, and Raw modes (unclamped true HDR extension breaking the 4.0 limit) for pixel point clouds, accurately reconstructing path-to-white trajectories.
 
 ### 3. Tech Stack
@@ -109,7 +110,8 @@ npm run build
 - **OCIO 2.0 混合配置生成 (Hybrid OCIO 2.0 Config)**：动态打包生成的 OCIO 2.0 配置，不仅支持将自定义的 OpenDRT 变换注册为默认 View，还融合了 Nuke、Mari、Substance Painter 等工业软件所需的各种复杂 ColorSpace 和 Roles 设定，实现与工业管线的无缝对接。
 - **节点流向图 (DAG) 与像素探针**：可逐节点点击查看色彩流动状态，配合 KaTeX 公式引擎展示与内核对应的数学公式，并提供精准的单像素 RGB 输入/输出探针。
 - **多维可视化图表**：
-  - **2D CIE 1931 色度图**：展示源像素与目标像素的散点分布及其向 D65 白点收拢的过程。
+  - **2D CIE 1931 色度图**：展示源像素与目标像素的散点分布及其向 D65 白点收拢的过程。采用高精度光谱轨迹边界。
+  - **曲线视图 (数学示波器)**：支持动态绘制 Tonescale、Hue Shift（拆解为 RGB 独立分量）、Brilliance 以及 OETF/EOTF Transfer 传递函数曲线。支持像素探针实时投影，并配备动态 LaTeX 公式渲染面板。
   - **3D 色域体积 (Three.js)**：支持 Clip、Tonemap 及 Raw 模式（突破 4.0 限制的自然延伸）的像素点云展示，精准重构 Path-to-white 轨迹。
 
 ### 3. 技术栈
