@@ -4,8 +4,10 @@ import type { DrtParams } from "../params";
 import { decodeSceneLinear, type LoadedSource } from "./loadImage";
 
 /**
- * 导出原分辨率图像 (Native Resolution Image Export)
- * 基于 CPU evaluateCPU 渲染全图，支持 4K+ 级别
+ * [EN] Export native resolution image
+ * [ZH] 导出原分辨率图像 (Native Resolution Image Export)
+ * [EN] Renders the full image offscreen using CPU evaluateCPU, supporting 4K+ resolution
+ * [ZH] 基于 CPU evaluateCPU 渲染全图，支持 4K+ 级别
  */
 export async function exportNativeResolutionImage(
   source: LoadedSource,
@@ -20,12 +22,13 @@ export async function exportNativeResolutionImage(
   offscreenCanvas.width = width;
   offscreenCanvas.height = height;
   const ctx = offscreenCanvas.getContext("2d");
-  if (!ctx) throw new Error("无法创建离屏 Canvas 上下文");
+  if (!ctx) throw new Error("无法创建离屏 Canvas 上下文"); // [EN] Failed to create offscreen Canvas context
 
   const imageData = ctx.createImageData(width, height);
   const d = imageData.data;
 
-  // 分片处理，防止阻塞主线程
+  // [EN] Process in chunks to prevent blocking the main thread
+  // [ZH] 分片处理，防止阻塞主线程
   const totalPixels = width * height;
   let p = 0;
 
@@ -59,7 +62,8 @@ export async function exportNativeResolutionImage(
           a.click();
           URL.revokeObjectURL(url);
         }
-        // 清理
+        // [EN] Clean up offscreen resources
+        // [ZH] 清理
         offscreenCanvas.width = 0;
         offscreenCanvas.height = 0;
         resolve();
@@ -70,7 +74,8 @@ export async function exportNativeResolutionImage(
 }
 
 /**
- * 异步分片计算并生成 3D LUT (.cube)
+ * [EN] Asynchronously compute and generate 3D LUT (.cube) in chunks
+ * [ZH] 异步分片计算并生成 3D LUT (.cube)
  */
 export async function generateCubeLut(
   params: DrtParams,
@@ -82,7 +87,8 @@ export async function generateCubeLut(
     let cubeStr = `TITLE "OpenDRT_Web_Export"\nLUT_3D_SIZE ${size}\n\n`;
     const data: string[] = [];
 
-    // 分片处理，防止阻塞主线程
+    // [EN] Process in chunks to prevent blocking the main thread
+    // [ZH] 分片处理，防止阻塞主线程
     let b = 0;
 
     function processChunk() {
@@ -117,7 +123,8 @@ export async function generateCubeLut(
 }
 
 /**
- * 导出 3D LUT
+ * [EN] Export 3D LUT
+ * [ZH] 导出 3D LUT
  */
 export async function exportCube(
   params: DrtParams,
@@ -135,7 +142,8 @@ export async function exportCube(
 }
 
 /**
- * 获取 OCIO 2.0 配置模板并注入自定义内容
+ * [EN] Get OCIO 2.0 config template and inject custom content
+ * [ZH] 获取 OCIO 2.0 配置模板并注入自定义内容
  */
 export function getOcioConfig(customCubeName: string): string {
   return `ocio_profile_version: 2.0
@@ -303,7 +311,8 @@ looks:
 }
 
 /**
- * 导出 OCIO 2.0 打包
+ * [EN] Export OCIO 2.0 bundle
+ * [ZH] 导出 OCIO 2.0 打包
  */
 export async function exportOcioBundle(
   params: DrtParams,

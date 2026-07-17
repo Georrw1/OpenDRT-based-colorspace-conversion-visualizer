@@ -1,12 +1,17 @@
-// 图像上传 + 解码为 scene-linear RGBA float。
+// [EN] Image upload + decoding to scene-linear RGBA float.
+// [ZH] 图像上传 + 解码为 scene-linear RGBA float。
 //
-// SDR(PNG/JPG):画到离屏 canvas → getImageData 取 8bit [0,1] 编码值 → 按所选 Input OETF
+// [EN] SDR(PNG/JPG): Draw to offscreen canvas → getImageData to get 8bit [0,1] encoded values → Decode back to scene-linear using the selected Input OETF (via drt.ts linearizeScalar).
+// [ZH] SDR(PNG/JPG):画到离屏 canvas → getImageData 取 8bit [0,1] 编码值 → 按所选 Input OETF
 //   用内核 linearize() 的移植(drt.ts linearizeScalar)反解码回 scene-linear。
-// EXR(scene-linear HDR):parse-exr(three EXRLoader 的独立版,纯 JS + fflate)解出 Float32 RGBA,
+// [EN] EXR(scene-linear HDR): Use parse-exr to extract Float32 RGBA. It's already linear, so skip OETF decoding.
+// [ZH] EXR(scene-linear HDR):parse-exr(three EXRLoader 的独立版,纯 JS + fflate)解出 Float32 RGBA,
 //   已是线性,不做曲线反解;仍按所选 Input Gamut 走矩阵(在 GLSL / CIE 里做)。
-// 无图:回退内置合成测试图(曝光渐变 × 色相条),空状态也能演示。
+// [EN] No image: Fallback to built-in synthetic test pattern.
+// [ZH] 无图:回退内置合成测试图(曝光渐变 × 色相条),空状态也能演示。
 //
-// 忠实性:OETF 反解码复用内核定义(linearizeScalar),不另写一套曲线。
+// [EN] Fidelity: OETF decoding reuses kernel definitions (linearizeScalar) without rewriting separate curves.
+// [ZH] 忠实性:OETF 反解码复用内核定义(linearizeScalar),不另写一套曲线。
 
 import parseExr from "parse-exr";
 import { linearizeScalar } from "../drt";

@@ -8,6 +8,7 @@
 
 import { resolveConfig, evaluateCPU, evaluateCPUTrace } from "../drt";
 import type { DrtParams } from "../params";
+import { t } from "../locales/i18n";
 
 const BG = "#0e0e10";
 const GRID = "#2a2a2e";
@@ -50,9 +51,9 @@ function drawTonescale(ctx: CanvasRenderingContext2D, x0: number, y0: number, w:
   }
   ctx.fillStyle = FG;
   ctx.font = "12px monospace";
-  ctx.fillText("Tonescale 曲线:横轴 = log2 曝光(中灰0.18=0档),纵轴 = 输出编码值", X0, y0 + 16);
+  ctx.fillText(t("curves.ts_title"), X0, y0 + 16);
   ctx.fillStyle = AXIS_TXT;
-  ctx.fillText("log2(曝光 / 0.18)", X0 + PW - 110, Y0 + 30);
+  ctx.fillText(t("curves.log2_exp"), X0 + PW - 110, Y0 + 30);
 
   // 曲线:对中性灰扫描
   const N = 240;
@@ -76,7 +77,7 @@ function drawTonescale(ctx: CanvasRenderingContext2D, x0: number, y0: number, w:
   ctx.beginPath(); ctx.arc(px(0), py(midV), 4, 0, 2 * Math.PI); ctx.fill();
   ctx.fillStyle = "#5ab4ff";
   ctx.font = "11px monospace";
-  ctx.fillText(`中灰 0.18 -> ${midV.toFixed(3)}`, px(0) + 8, py(midV) - 8);
+  ctx.fillText(t("curves.mid_gray", midV.toFixed(3)), px(0) + 8, py(midV) - 8);
 
   // shoulder 起始区域标注(用 ts_x1 概念:tn_sh 决定的膝点附近,约在高光区域)
   ctx.strokeStyle = "rgba(160,160,180,0.35)";
@@ -85,7 +86,7 @@ function drawTonescale(ctx: CanvasRenderingContext2D, x0: number, y0: number, w:
   ctx.setLineDash([]);
   ctx.fillStyle = "#8a8a92";
   ctx.font = "10px monospace";
-  ctx.fillText("高光肩部区域(见右上放大图) ->", px(2) + 4, Y0 - PH + 12);
+  ctx.fillText(t("curves.shoulder_hint"), px(2) + 4, Y0 - PH + 12);
 
   // ---- 高光肩部放大插图:+2..+8 档,纵轴局部放大到 0.82..1.02 ----
   // 主曲线在 0..1 全量程下 tn_sh 造成的差异只有零点几个百分点,肉眼很难分辨;
@@ -119,7 +120,7 @@ function drawTonescale(ctx: CanvasRenderingContext2D, x0: number, y0: number, w:
   }
   ctx.fillStyle = "#bcbcc2";
   ctx.font = "10px monospace";
-  ctx.fillText("高光肩部放大(+2..+8档)", insetX + 6, insetY + 12);
+  ctx.fillText(t("curves.shoulder_inset"), insetX + 6, insetY + 12);
 
   ctx.strokeStyle = "#ffd23c";
   ctx.lineWidth = 2;
@@ -139,7 +140,7 @@ function drawTonescale(ctx: CanvasRenderingContext2D, x0: number, y0: number, w:
   ctx.fillStyle = "#9a9aa0";
   ctx.font = "11px monospace";
   ctx.fillText(
-    `tn_sh(肩部)=${params.tnSh.toFixed(2)} · tn_con(对比度)=${params.tnCon.toFixed(2)} · tn_Lg(中灰目标)=${params.tnLg.toFixed(1)} · tn_Lp(峰值亮度)=${params.tnLp.toFixed(0)} nits`,
+    t("curves.ts_params", params.tnSh.toFixed(2), params.tnCon.toFixed(2), params.tnLg.toFixed(1), params.tnLp.toFixed(0)),
     X0, y0 + h - 6,
   );
 }
@@ -170,16 +171,16 @@ function drawChromaPurity(ctx: CanvasRenderingContext2D, x0: number, y0: number,
   }
   ctx.fillStyle = FG;
   ctx.font = "12px monospace";
-  ctx.fillText("Chroma / Purity 压缩曲线:横轴 = 输入饱和度,纵轴 = 纯度保留系数 ptf", X0, y0 + 16);
+  ctx.fillText(t("curves.chroma_title"), X0, y0 + 16);
   ctx.fillStyle = AXIS_TXT;
-  ctx.fillText("输入饱和度(0=灰,1=纯色)", X0 + PW - 150, Y0 + 30);
+  ctx.fillText(t("curves.chroma_x"), X0 + PW - 150, Y0 + 30);
 
   // 几个曝光档位(不同亮度)× 一个固定色相(红),扫描饱和度 0..1
   const EXPOSURES: Array<[number, string, string]> = [
-    [0.18 * 0.25, "#5ab4ff", "-2 档(暗部)"],
-    [0.18, "#ffaa3c", "0 档(中灰)"],
-    [0.18 * 4, "#7fdf7f", "+2 档(高光)"],
-    [0.18 * 16, "#ff8080", "+4 档(强高光)"],
+    [0.18 * 0.25, "#5ab4ff", t("curves.exp_m2")],
+    [0.18, "#ffaa3c", t("curves.exp_0")],
+    [0.18 * 4, "#7fdf7f", t("curves.exp_p2")],
+    [0.18 * 16, "#ff8080", t("curves.exp_p4")],
   ];
   const N = 100;
   for (const [e, color] of EXPOSURES) {
@@ -214,7 +215,7 @@ function drawChromaPurity(ctx: CanvasRenderingContext2D, x0: number, y0: number,
 
   ctx.fillStyle = "#9a9aa0";
   ctx.font = "11px monospace";
-  ctx.fillText("固定红色相方向扫描;ptf 越低 = 该处纯度被压缩得越多(常见于高光防溢出)。", X0, y0 + h - 6);
+  ctx.fillText(t("curves.chroma_hint"), X0, y0 + h - 6);
 }
 
 /** 主入口:在 canvas 上画两张曲线图(上下排列),随 params 实时重画。 */

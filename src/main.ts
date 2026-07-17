@@ -7,6 +7,7 @@
 
 import { DEFAULT_PARAMS, type DrtParams } from "./params";
 import { buildSourcePanel, buildOpenDrtPanel } from "./panel";
+import { setLang, getLang, t, updateDomTranslations } from "./locales/i18n";
 import { createGLContext, type GLContext } from "./gl/context";
 import { FullscreenPass } from "./gl/fullscreenPass";
 import { renderRegression } from "./views/regression";
@@ -85,19 +86,19 @@ try {
 }
 
 function updateImgInfo() {
-  const kindLabel = source.kind === "exr" ? "EXR (scene-linear)" : source.kind === "sdr" ? "SDR" : "";
-  // 合成图的 name 已是"合成测试图",无需再追加同名 kindLabel(避免重复)。
+  const kindLabel = source.kind === "exr" ? t("img.info.exr") : source.kind === "sdr" ? t("img.info.sdr") : "";
+  const name = source.kind === "synthetic" ? t("img.info.synthetic" as any) || "Synthetic Image" : source.name;
   imgInfo.textContent = kindLabel
-    ? `${source.name} · ${source.width}×${source.height} · ${kindLabel}`
-    : `${source.name} · ${source.width}×${source.height}`;
+    ? `${name} · ${source.width}×${source.height} · ${kindLabel}`
+    : `${name} · ${source.width}×${source.height}`;
 }
 
 function updateProbeInfo() {
   if (!probePixel) {
-    probeInfo.textContent = "像素探针:未选中(曲线/DAG 使用默认中灰 0.18)。在「图像预览」上点击或悬浮取像素。";
+    probeInfo.textContent = t("probe.unselected");
   } else {
     const { x, y, rgb } = probePixel;
-    probeInfo.textContent = `像素探针:源图坐标 (${x}, ${y}) · scene-linear RGB = ${rgb[0].toFixed(4)}, ${rgb[1].toFixed(4)}, ${rgb[2].toFixed(4)}`;
+    probeInfo.textContent = t("probe.selected", x, y, `${rgb[0].toFixed(4)}, ${rgb[1].toFixed(4)}, ${rgb[2].toFixed(4)}`);
   }
 }
 
@@ -163,8 +164,6 @@ function pickPixelAt(dispX: number, dispY: number): { x: number; y: number; rgb:
 function syncProbeOverlaySize() {
   probeOverlay.width = glCanvas.width;
   probeOverlay.height = glCanvas.height;
-  probeOverlay.style.width = glCanvas.style.width || `${glCanvas.width}px`;
-  probeOverlay.style.height = glCanvas.style.height || `${glCanvas.height}px`;
 }
 
 // 「整图中间态」用的降采样 scene-linear 缓存(按 源+OETF 缓存,避免每次点节点都重解码/重采样)。
@@ -244,7 +243,7 @@ updateProbeInfo();
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   if (!file) return;
-  imgInfo.textContent = `解码中:${file.name} …`;
+  imgInfo.textContent = t("img.decoding", file.name);
   try {
     source = await loadImageFile(file);
     probePixel = null;
@@ -355,43 +354,63 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>(".tab")) {
 
 // 导出功能
 exportImgBtn.addEventListener("click", async () => {
-  const oldText = exportImgBtn.textContent;
-  exportImgBtn.textContent = "正在导出...";
+  exportImgBtn.textContent = t("image.exporting");
   exportImgBtn.disabled = true;
   try {
     await exportNativeResolutionImage(source, params, (p) => {
-      exportImgBtn.textContent = `正在导出... ${Math.round(p * 100)}%`;
+      exportImgBtn.textContent = `${t("image.exporting")} ${Math.round(p * 100)}%`;
     });
   } catch (e) {
-    alert(`导出失败: ${(e as Error).message}`);
+    alert(`${t("image.export_fail")}${(e as Error).message}`);
   }
-  exportImgBtn.textContent = oldText;
+  exportImgBtn.textContent = t("image.export");
   exportImgBtn.disabled = false;
 });
 
 exportCubeBtn.addEventListener("click", async () => {
   const size = parseInt(lutSizeSel.value, 10);
-  const oldText = exportCubeBtn.textContent;
-  exportCubeBtn.textContent = "正在生成 LUT...";
+  exportCubeBtn.textContent = t("export.generating_lut");
   exportCubeBtn.disabled = true;
   await exportCube(params, size, (p) => {
-    exportCubeBtn.textContent = `正在生成 LUT... ${Math.round(p * 100)}%`;
+    exportCubeBtn.textContent = `${t("export.generating_lut")} ${Math.round(p * 100)}%`;
   });
-  exportCubeBtn.textContent = oldText;
+  exportCubeBtn.textContent = t("sidebar.export_cube");
   exportCubeBtn.disabled = false;
 });
 
 exportOcioBtn.addEventListener("click", async () => {
   const size = parseInt(lutSizeSel.value, 10);
-  const oldText = exportOcioBtn.textContent;
-  exportOcioBtn.textContent = "正在打包 OCIO...";
+  exportOcioBtn.textContent = t("export.packing_ocio");
   exportOcioBtn.disabled = true;
   await exportOcioBundle(params, size, (p) => {
-    exportOcioBtn.textContent = `正在打包 OCIO... ${Math.round(p * 100)}%`;
+    exportOcioBtn.textContent = `${t("export.packing_ocio")} ${Math.round(p * 100)}%`;
   });
-  exportOcioBtn.textContent = oldText;
+  exportOcioBtn.textContent = t("sidebar.export_ocio");
   exportOcioBtn.disabled = false;
 });
+
+const langBtn = document.getElementById("lang-btn")!;
+
+function rerenderAllComponents() {
+  if (pass) {
+    void renderRegression(regDiv, pass);
+    renderImage(glCanvas, pass, params, source);
+  }
+  renderCie(cieCanvas, params, source, { mode: cieMode, showPtw: ciePtw });
+  renderCurves(curvesCanvas, params);
+  rerenderDag();
+  rerenderGamut3d();
+}
+
+langBtn.addEventListener("click", () => {
+  setLang(getLang() === 'en' ? 'zh' : 'en');
+  updateProbeInfo();
+  updateImgInfo();
+  rerenderAllComponents();
+});
+
+// Initialize translation on startup
+updateDomTranslations();
 
 devLink.addEventListener("click", () => {
   location.hash = "regression";

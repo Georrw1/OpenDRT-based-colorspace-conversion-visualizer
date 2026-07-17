@@ -8,6 +8,7 @@
 import { resolveConfig, evaluateCPUTrace, TRACE_NODE_INFO, type TraceStep, type ResolvedConfig } from "../drt";
 import type { DrtParams } from "../params";
 import { NODE_FORMULAS } from "../nodeFormulas";
+import { t, getLang } from "../locales/i18n";
 
 // KaTeX 从 CDN 以 defer 加载,渲染时用 window.katex(可能尚未就绪则降级为纯文本)。
 declare global { interface Window { katex?: any; } }
@@ -21,9 +22,9 @@ function renderKatex(el: HTMLElement, latex: string): void {
 }
 
 const BG = "#0e0e10";
-const NODE_W = 190;
-const NODE_H = 40;
-const NODE_GAP_Y = 22;
+const NODE_W = 230;
+const NODE_H = 44;
+const NODE_GAP_Y = 24;
 const COL_X = 40; // 节点左边缘
 const TOP_Y = 30;
 
@@ -134,7 +135,7 @@ export function renderDag(
   // 标题
   ctx.fillStyle = "#dcdce2";
   ctx.font = "13px monospace";
-  ctx.fillText("OpenDRT 处理流程(Nuke 风格节点图,自上而下)", COL_X, 18);
+  ctx.fillText(t("dag.flow_title"), COL_X, 18);
 
   for (let i = 0; i < n; i++) {
     const info = TRACE_NODE_INFO[i];
@@ -187,10 +188,10 @@ export function renderDag(
       ctx.strokeRect(swatchX, swatchY, swatchS, swatchS);
     }
 
-    // 节点序号 + 中文名
+    // 节点序号 + 中英文名
     ctx.fillStyle = "#dcdce2";
     ctx.font = "12px monospace";
-    ctx.fillText(`${i + 1}. ${info.label}`, swatchX + swatchS + 8, top + NODE_H / 2 - 2);
+    ctx.fillText(`${i + 1}. ${t(`node.${info.id}.label` as any)}`, swatchX + swatchS + 8, top + NODE_H / 2 - 2);
 
     // RGB 数值(小字)
     if (step) {
@@ -217,8 +218,8 @@ export function renderDagInfoPanel(
   probeInput: [number, number, number] | null,
 ): void {
   if (index === null) {
-    infoEl.innerHTML = `<p class="note">悬浮或点击左侧节点,查看该步骤的中文说明与探针像素数值。${
-      probeInput ? "" : "当前未选中图像像素,使用默认中灰 0.18 作为探针。"
+    infoEl.innerHTML = `<p class="note">${t("dag.info_empty")} ${
+      probeInput ? "" : t("dag.probe.unselected")
     }</p>`;
     return;
   }
@@ -232,29 +233,29 @@ export function renderDagInfoPanel(
     const rows = Object.entries(step.scalars)
       .map(([k, v]) => `<tr><td>${k}</td><td>${fmt(v)}</td></tr>`)
       .join("");
-    scalarsHtml = `<table><thead><tr><th>关键标量</th><th>数值</th></tr></thead><tbody>${rows}</tbody></table>`;
+    scalarsHtml = `<table><thead><tr><th>${t("dag.scalar_key")}</th><th>${t("dag.scalar_val")}</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   const nf = NODE_FORMULAS[info.id];
   const probeStr = probeInput
     ? `${fmt(probeInput[0])}, ${fmt(probeInput[1])}, ${fmt(probeInput[2])}`
-    : "默认中灰 0.18, 0.18, 0.18";
+    : t("dag.default_probe");
 
   // 先用 innerHTML 铺基础结构(含公式占位),再用 KaTeX 渲染公式占位。
   const formulaPlaceholders = nf
     ? nf.formula.map((_, i) => `<div class="formula-block" data-fi="${i}"></div>`).join("")
     : "";
   const theoryHtml = nf
-    ? `<div class="section-label">原理讲解</div><div class="theory-text">${nf.theory}</div>` +
-      (nf.vars ? `<div class="vars-note">${nf.vars}</div>` : "")
+    ? `<div class="section-label">${t("dag.theory")}</div><div class="theory-text">${(nf.theory as any)?.[getLang() === 'en' ? 'en' : 'zh'] || (nf.theory as any)?.zh || nf.theory}</div>` +
+      (nf.vars ? `<div class="vars-note">${(nf.vars as any)?.[getLang() === 'en' ? 'en' : 'zh'] || (nf.vars as any)?.zh || nf.vars}</div>` : "")
     : "";
   const formulaSection = nf
-    ? `<div class="section-label">公式(与内核逐行对应)</div>${formulaPlaceholders}`
+    ? `<div class="section-label">${t("dag.formula")}</div>${formulaPlaceholders}`
     : "";
 
   infoEl.innerHTML = `
-    <h3>${index + 1}. ${info.label}</h3>
-    <p class="note">${info.desc}</p>
+    <h3>${index + 1}. ${t(`node.${info.id}.label` as any)}</h3>
+    <p class="note">${t(`node.${info.id}.desc` as any)}</p>
     <div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
       <div style="width:28px;height:28px;border:1px solid #555;background:${swatch};"></div>
       <span style="font-family:monospace;font-size:12px;color:#dcdce2;">
@@ -263,7 +264,7 @@ export function renderDagInfoPanel(
     </div>
     ${scalarsHtml}
     <p class="note" style="margin-top:8px;">
-      探针输入(scene-linear)= ${probeStr}
+      ${t("dag.probe.input")}= ${probeStr}
     </p>
     ${formulaSection}
     ${theoryHtml}

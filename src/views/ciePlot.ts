@@ -8,6 +8,7 @@
 import { INPUT_GAMUT_MATRICES, resolveConfig, evaluateCPU } from "../drt";
 import type { DrtParams } from "../params";
 import { decodeSceneLinear, type LoadedSource } from "../io/loadImage";
+import { t } from "../locales/i18n";
 
 // 散点模式:位移连线(默认主角) / 仅处理前 / 仅处理后 / 前后叠加
 export type CieScatterMode = "shift" | "input" | "output" | "both";
@@ -17,13 +18,20 @@ const MAX_SHIFT_LINES = 700;  // 位移连线降采样上限(连线更重,数量
 
 // CIE 1931 2° 光谱轨迹 xy(近似标准值,用于背景马蹄形)。
 const SPECTRAL: Array<[number, number]> = [
-  [0.1741, 0.0050], [0.1733, 0.0048], [0.1714, 0.0051], [0.1644, 0.0109],
-  [0.1440, 0.0297], [0.1241, 0.0578], [0.0913, 0.1327], [0.0454, 0.2950],
-  [0.0082, 0.5384], [0.0139, 0.7502], [0.0743, 0.8338], [0.1547, 0.8059],
-  [0.2296, 0.7543], [0.3016, 0.6923], [0.3731, 0.6245], [0.4441, 0.5547],
-  [0.5125, 0.4866], [0.5752, 0.4242], [0.6270, 0.3725], [0.6658, 0.3340],
-  [0.6915, 0.3083], [0.7079, 0.2920], [0.7190, 0.2809], [0.7260, 0.2740],
-  [0.7347, 0.2653],
+  [0.1741, 0.0050],  [0.1740, 0.0050],  [0.1738, 0.0049],  [0.1736, 0.0049],  [0.1733, 0.0048],  [0.1730, 0.0048],
+  [0.1726, 0.0048],  [0.1721, 0.0048],  [0.1714, 0.0051],  [0.1703, 0.0058],  [0.1689, 0.0069],  [0.1669, 0.0086],
+  [0.1644, 0.0109],  [0.1611, 0.0138],  [0.1566, 0.0177],  [0.1510, 0.0227],  [0.1440, 0.0297],  [0.1355, 0.0399],
+  [0.1241, 0.0578],  [0.1096, 0.0868],  [0.0913, 0.1327],  [0.0687, 0.2007],  [0.0454, 0.2950],  [0.0235, 0.4127],
+  [0.0082, 0.5384],  [0.0039, 0.6548],  [0.0139, 0.7502],  [0.0389, 0.8120],  [0.0743, 0.8338],  [0.1142, 0.8262],
+  [0.1547, 0.8059],  [0.1929, 0.7816],  [0.2296, 0.7543],  [0.2658, 0.7243],  [0.3016, 0.6923],  [0.3374, 0.6588],
+  [0.3731, 0.6245],  [0.4087, 0.5896],  [0.4441, 0.5547],  [0.4788, 0.5202],  [0.5125, 0.4866],  [0.5448, 0.4544],
+  [0.5752, 0.4242],  [0.6029, 0.3965],  [0.6270, 0.3725],  [0.6482, 0.3514],  [0.6658, 0.3340],  [0.6801, 0.3197],
+  [0.6915, 0.3083],  [0.7006, 0.2993],  [0.7079, 0.2920],  [0.7140, 0.2859],  [0.7190, 0.2809],  [0.7230, 0.2769],
+  [0.7260, 0.2740],  [0.7283, 0.2717],  [0.7300, 0.2700],  [0.7311, 0.2689],  [0.7320, 0.2680],  [0.7327, 0.2673],
+  [0.7334, 0.2666],  [0.7340, 0.2660],  [0.7344, 0.2656],  [0.7346, 0.2654],  [0.7347, 0.2653],  [0.7347, 0.2653],
+  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],
+  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],
+  [0.7347, 0.2653],  [0.7347, 0.2653],  [0.7347, 0.2653],
 ];
 
 type Mat3 = number[][];
@@ -239,18 +247,18 @@ export function renderCie(
   const legendItems: Array<[string, string, "sq" | "line" | "dash" | "dot"]> = [];
   if (source) {
     if (mode === "shift") {
-      legendItems.push(["处理前像素", BLUE, "sq"]);
-      legendItems.push(["处理后像素", ORANGE, "sq"]);
-      legendItems.push(["→ 每个颜色的位移", "rgba(200,200,210,0.7)", "line"]);
+      legendItems.push([t("cie.legend.before"), BLUE, "sq"]);
+      legendItems.push([t("cie.legend.after"), ORANGE, "sq"]);
+      legendItems.push([t("cie.legend.shift"), "rgba(200,200,210,0.7)", "line"]);
     } else {
-      if (mode === "input" || mode === "both") legendItems.push(["处理前像素(输入)", BLUE, "sq"]);
-      if (mode === "output" || mode === "both") legendItems.push(["处理后像素(输出)", ORANGE, "sq"]);
+      if (mode === "input" || mode === "both") legendItems.push([t("cie.legend.before_input"), BLUE, "sq"]);
+      if (mode === "output" || mode === "both") legendItems.push([t("cie.legend.after_output"), ORANGE, "sq"]);
     }
   }
-  legendItems.push([`源色域 ${inGamutName}`, "#e8e8ee", "dash"]);
-  if (displayName !== inGamutName) legendItems.push([`显示色域 ${displayName}`, "#8a8a92", "dot"]);
-  legendItems.push(["可见色边界(光谱轨迹)", "#9a9aa0", "line"]);
-  if (showPtw) legendItems.push(["R/G/B path-to-white", "#ff8080", "line"]);
+  legendItems.push([t("cie.legend.gamut_src", inGamutName), "#e8e8ee", "dash"]);
+  if (displayName !== inGamutName) legendItems.push([t("cie.legend.gamut_disp", displayName), "#8a8a92", "dot"]);
+  legendItems.push([t("cie.legend.spectral"), "#9a9aa0", "line"]);
+  if (showPtw) legendItems.push([t("cie.legend.ptw_rgb"), "#ff8080", "line"]);
 
   // 图例底板
   const boxW = 210, boxH = legendItems.length * 19 + 14;
@@ -280,7 +288,7 @@ export function renderCie(
   // 底部一句话说明
   ctx.fillStyle = "#888";
   ctx.font = "11px monospace";
-  const srcName = source ? source.name : "(未上传)";
-  const modeTxt = mode === "shift" ? "位移连线" : mode === "input" ? "仅处理前" : mode === "output" ? "仅处理后" : "前后叠加";
-  ctx.fillText(`色度地图 · 显示 = ${modeTxt} · 像素来自:${srcName}`, pad, H - 14);
+  const srcName = source ? source.name : t("cie.footer.no_img");
+  const modeTxt = mode === "shift" ? t("cie.footer.mode_shift") : mode === "input" ? t("cie.footer.mode_input") : mode === "output" ? t("cie.footer.mode_output") : t("cie.footer.mode_both");
+  ctx.fillText(t("cie.footer.text", modeTxt, srcName), pad, H - 14);
 }

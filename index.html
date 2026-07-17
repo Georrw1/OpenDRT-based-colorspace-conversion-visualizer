@@ -17,8 +17,8 @@
       overflow: hidden;
     }
     #panel {
-      width: 300px;
-      flex: 0 0 300px;
+      width: 320px;
+      flex: 0 0 320px;
       padding: 16px;
       background: #202020;
       border-right: 1px solid #333;
@@ -109,6 +109,7 @@
     }
     #tabs {
       display: flex;
+      flex-wrap: wrap;
       gap: 4px;
       padding: 8px 8px 0;
       background: #202020;
@@ -161,12 +162,12 @@
     /* 图像预览容器:WebGL canvas 之上叠加一层透明 2D canvas 画十字准星(像素探针)。 */
     #image-wrap { position: relative; display: inline-block; }
     /* 叠加层必须透明背景,否则全局 canvas{background:#111} 会挡住下方图像预览 → 黑屏。 */
-    #probe-overlay { position: absolute; left: 0; top: 0; pointer-events: none; background: transparent; }
+    #probe-overlay { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; background: transparent; }
 
     /* DAG 流程图:左侧节点图(可滚动) + 右侧信息面板。 */
     #view-dag { display: flex; gap: 16px; align-items: flex-start; }
     #dag-canvas-wrap { flex: 0 0 auto; max-height: calc(100vh - 140px); overflow-y: auto; border: 1px solid #2a2a2e; }
-    #dag-right { flex: 1 1 auto; min-width: 320px; display: flex; flex-direction: column; gap: 14px; }
+    #dag-right { flex: 1 1 auto; min-width: 360px; display: flex; flex-direction: column; gap: 14px; }
     #dag-image-box { background: #0e0e10; border: 1px solid #2a2a2e; border-radius: 6px; padding: 12px; }
     #dag-image-title { color: #8a8a92; font-size: 12px; margin-bottom: 8px; }
     #dag-image { width: 100%; height: auto; image-rendering: auto; background: #000; border: 1px solid #2a2a2e; display: block; }
@@ -178,7 +179,7 @@
       background: #101014; border: 1px solid #2a2a2e; border-radius: 5px;
       padding: 10px 12px; margin: 10px 0; overflow-x: auto;
     }
-    .formula-block .katex { font-size: 1.02em; color: #e6e6ea; }
+    .formula-block .katex { font-size: 1.4em; color: #e6e6ea; }
     .formula-block .katex-display { margin: 6px 0; }
     .section-label { color: #6cf; font-size: 11px; font-weight: 600; letter-spacing: .04em;
       text-transform: uppercase; margin: 12px 0 4px; }
@@ -234,65 +235,69 @@
 </head>
 <body>
   <aside id="panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <span style="color: #bbb; font-weight: bold; font-size: 14px;">OpenDRT Visualizer</span>
+      <button id="lang-btn" style="background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">EN / 中文</button>
+    </div>
     <div class="group">
-      <h2>① 图像</h2>
+      <h2 data-i18n="sidebar.step1">① 图像</h2>
       <label id="upload-btn">
-        上传图像 (PNG / JPG / EXR)
+        <span data-i18n="sidebar.upload">上传图像 (PNG / JPG / EXR)</span>
         <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.exr,image/*" hidden />
       </label>
       <div id="img-info"></div>
     </div>
     <div class="group">
-      <h2>② 源色彩空间</h2>
+      <h2 data-i18n="sidebar.step2">② 源色彩空间</h2>
       <div id="panel-source"></div>
     </div>
     <div class="group">
-      <h2>③ OpenDRT</h2>
+      <h2 data-i18n="sidebar.step3">③ OpenDRT</h2>
       <div id="panel-opendrt"></div>
     </div>
     <div class="group" id="export-group">
-      <h2>④ 导出配置</h2>
+      <h2 data-i18n="sidebar.step4">④ 导出配置</h2>
       <div class="field">
-        <span>LUT 精度</span>
+        <span data-i18n="sidebar.lut_size">LUT 精度</span>
         <select id="lut-size-sel">
-          <option value="33">33 (默认)</option>
+          <option value="33">33 <span data-i18n="sidebar.lut_default">(默认)</span></option>
           <option value="65">65</option>
         </select>
       </div>
-      <button id="export-cube-btn" style="width: 100%; margin-bottom: 8px; background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 10px; border-radius: 6px; cursor: pointer;">导出 3D LUT (.cube)</button>
-      <button id="export-ocio-btn" style="width: 100%; background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 10px; border-radius: 6px; cursor: pointer;">导出 OCIO 打包 (.zip)</button>
+      <button id="export-cube-btn" data-i18n="sidebar.export_cube" style="width: 100%; margin-bottom: 8px; background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 10px; border-radius: 6px; cursor: pointer;">导出 3D LUT (.cube)</button>
+      <button id="export-ocio-btn" data-i18n="sidebar.export_ocio" style="width: 100%; background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 10px; border-radius: 6px; cursor: pointer;">导出 OCIO 打包 (.zip)</button>
     </div>
   </aside>
   <div id="main">
     <nav id="tabs">
-      <button class="tab" data-tab="image">图像预览</button>
-      <button class="tab" data-tab="cie">CIE 色度图</button>
-      <button class="tab" data-tab="curves">曲线</button>
-      <button class="tab" data-tab="dag">流程图(DAG)</button>
-      <button class="tab" data-tab="gamut3d">3D 色域</button>
+      <button class="tab" data-tab="image" data-i18n="tab.image">图像预览</button>
+      <button class="tab" data-tab="cie" data-i18n="tab.cie">CIE 色度图</button>
+      <button class="tab" data-tab="curves" data-i18n="tab.curves">曲线</button>
+      <button class="tab" data-tab="dag" data-i18n="tab.dag">流程图(DAG)</button>
+      <button class="tab" data-tab="gamut3d" data-i18n="tab.gamut3d">3D 色域</button>
       <span id="g3d-controls" style="display:none;">
-        点云
+        <span data-i18n="g3d.point_cloud">点云</span>
         <select id="g3d-mode">
-          <option value="both">clip vs tonemap 对比</option>
-          <option value="clip">仅 clip(原始 linear 钳制)</option>
-          <option value="tonemap">仅 tonemap(过 OpenDRT)</option>
-          <option value="raw">仅 raw(不钳不压真实延伸)</option>
+          <option value="both" data-i18n="g3d.mode.both">clip vs tonemap 对比</option>
+          <option value="clip" data-i18n="g3d.mode.clip">仅 clip(原始 linear 钳制)</option>
+          <option value="tonemap" data-i18n="g3d.mode.tonemap">仅 tonemap(过 OpenDRT)</option>
+          <option value="raw" data-i18n="g3d.mode.raw">仅 raw(不钳不压真实延伸)</option>
         </select>
-        <label style="margin-left:10px;"><input type="checkbox" id="g3d-hull" checked> 色域线框</label>
-        <label style="margin-left:10px;"><input type="checkbox" id="g3d-ptw" checked> path to white</label>
+        <label style="margin-left:10px;"><input type="checkbox" id="g3d-hull" checked> <span data-i18n="g3d.hull">色域线框</span></label>
+        <label style="margin-left:10px;"><input type="checkbox" id="g3d-ptw" checked> <span data-i18n="g3d.ptw">path to white</span></label>
       </span>
       <span id="cie-controls" style="display:none;">
-        显示
+        <span data-i18n="cie.display">显示</span>
         <select id="cie-mode">
-          <option value="shift">位移连线(推荐)</option>
-          <option value="both">前后叠加</option>
-          <option value="input">仅处理前</option>
-          <option value="output">仅处理后</option>
+          <option value="shift" data-i18n="cie.mode.shift">位移连线(推荐)</option>
+          <option value="both" data-i18n="cie.mode.both">前后叠加</option>
+          <option value="input" data-i18n="cie.mode.input">仅处理前</option>
+          <option value="output" data-i18n="cie.mode.output">仅处理后</option>
         </select>
-        <label style="margin-left:10px;"><input type="checkbox" id="cie-ptw"> path-to-white</label>
+        <label style="margin-left:10px;"><input type="checkbox" id="cie-ptw"> <span data-i18n="g3d.ptw">path-to-white</span></label>
       </span>
       <span id="image-controls" style="display:none; margin-left: auto; padding-bottom: 6px;">
-        <button id="export-img-btn" style="background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">导出当前图像 (PNG)</button>
+        <button id="export-img-btn" data-i18n="image.export" style="background: #2a3a4a; color: #cfe6ff; border: 1px solid #3a5a7a; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">导出当前图像 (PNG)</button>
       </span>
     </nav>
     <div id="views">
@@ -312,18 +317,18 @@
         <div id="dag-canvas-wrap"><canvas id="dag-canvas" width="420"></canvas></div>
         <div id="dag-right">
           <div id="dag-image-box">
-            <div id="dag-image-title">整图中间态 · 点击左侧节点查看该步骤后的整张图</div>
+            <div id="dag-image-title" data-i18n="dag.image_title">整图中间态 · 点击左侧节点查看该步骤后的整张图</div>
             <canvas id="dag-image" width="480" height="270"></canvas>
           </div>
           <div id="dag-info">
-            <p class="note">悬浮或点击左侧节点查看详情。</p>
+            <p class="note" data-i18n="dag.info_empty">悬浮或点击左侧节点查看详情。</p>
           </div>
         </div>
       </div>
     </div>
     <div id="footer">
       <span id="probe-info"></span>
-      <a id="dev-link">开发者 / 回归校验</a>
+      <a id="dev-link" data-i18n="footer.dev_link">开发者 / 回归校验</a>
     </div>
   </div>
   <script type="module" src="/src/main.ts"></script>

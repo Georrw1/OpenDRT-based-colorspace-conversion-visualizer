@@ -13,6 +13,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { resolveConfig, evaluateCPU, evaluateCPUTrace, TRACE_NODE_INFO, type ResolvedConfig } from "../drt";
 import type { DrtParams } from "../params";
+import { t } from "../locales/i18n";
+
 
 export type G3dMode = "both" | "clip" | "tonemap" | "raw";
 
@@ -338,21 +340,24 @@ export function updateGamut3d(
 
 /** 图例 HTML(说明各元素含义)。 */
 export function gamut3dLegendHtml(mode: G3dMode, probeInput: [number, number, number] | null): string {
-  const parts: string[] = ["<h4>3D 色域 · RGB 立方体</h4>"];
-  parts.push('<div><span class="sw" style="background:#555560"></span>立方体线框 = 显示 [0,1] 边界</div>');
-  parts.push('<div><span class="sw" style="background:#ff4444"></span>R 轴 <span class="sw" style="background:#44ff44;margin-left:6px"></span>G 轴 <span class="sw" style="background:#4488ff;margin-left:6px"></span>B 轴</div>');
-  if (mode === "clip" || mode === "both")
-    parts.push('<div style="margin-top:6px"><span class="sw" style="background:#888"></span>clip 点:原始 linear 硬钳,高光贴立方体表面(撞墙)</div>');
-  if (mode === "tonemap" || mode === "both")
-    parts.push('<div><span class="sw" style="background:#ccc"></span>tonemap 点:过 OpenDRT,高光沿曲线收拢</div>');
-  if (mode === "raw")
-    parts.push('<div style="margin-top:6px"><span class="sw" style="background:#aaa"></span>raw 点:原始 scene-linear 不钳不压,高光点伸出立方体外(真实 HDR 延伸)</div>');
-  parts.push('<div style="margin-top:6px"><span class="sw" style="background:#ffcc33"></span>path to white 轨迹</div>');
-  parts.push('<div><span class="sw" style="background:#33ddff"></span>轨迹起点(输入) <span class="sw" style="background:#ff8833;margin-left:6px"></span>终点(输出)</div>');
+  const parts: string[] = [t("g3d.legend.title")];
+  parts.push(`<div><span class="sw" style="background:#555560"></span>${t("g3d.legend.hull_desc")}</div>`);
+  parts.push(`<div><span class="sw" style="background:#ff4444"></span>${t("g3d.legend.axis")}</div>`);
+  if (mode === "clip" || mode === "both") {
+    parts.push(`<div style="margin-top:6px"><span class="sw" style="background:#888"></span>${t("g3d.legend.clip_desc")}</div>`);
+  }
+  if (mode === "tonemap" || mode === "both") {
+    parts.push(`<div><span class="sw" style="background:#ccc"></span>${t("g3d.legend.tonemap_desc")}</div>`);
+  }
+  if (mode === "raw") {
+    parts.push(`<div style="margin-top:6px"><span class="sw" style="background:#aaa"></span>${t("g3d.legend.raw_desc")}</div>`);
+  }
+  parts.push(`<div style="margin-top:6px"><span class="sw" style="background:#ffcc33"></span>${t("g3d.legend.ptw_desc")}</div>`);
+  parts.push(`<div><span class="sw" style="background:#33ddff"></span>${t("g3d.legend.ptw_start_end")}</div>`);
   const probeStr = probeInput
     ? `${probeInput[0].toFixed(4)}, ${probeInput[1].toFixed(4)}, ${probeInput[2].toFixed(4)}`
-    : "默认中灰 0.18";
+    : t("dag.default_probe");
   const ptwCount = TRACE_NODE_INFO.length - 4; // 只画渲染空间节点(跳过前4个)
-  parts.push(`<div class="hint">path to white 探针输入(scene-linear)= ${probeStr}<br>只画渲染空间内的 ${ptwCount} 个节点连成折线(跳过前 4 个 scene-linear/XYZ 节点)。<br><br>拖拽旋转 · 滚轮缩放 · 右键平移。<br>提示:clip 点撞在立方体面上=高光溢出;tonemap 点被曲线拉回体内=柔和压缩;raw 点伸出体外=真实 HDR 多亮。</div>`);
+  parts.push(`<div class="hint">${t("g3d.legend.ptw")} ${probeStr}<br>${t("g3d.legend.hint1", ptwCount)}<br><br>${t("g3d.legend.hint2")}<br>${t("g3d.legend.hint3")}</div>`);
   return parts.join("");
 }

@@ -1,10 +1,15 @@
-// OpenDRT v1.1.0 —— 参数解析 / 求解常数 / uniform 构建 / CPU 参考实现。
+// [EN] OpenDRT v1.1.0 - Parameter parsing / constant solving / uniform building / CPU reference implementation.
+// [ZH] OpenDRT v1.1.0 —— 参数解析 / 求解常数 / uniform 构建 / CPU 参考实现。
 //
-// 忠实移植自 opendrt_v110.py。矩阵常数直接复制,公式与控制流原样保留。
-// CPU 参考(evaluateCPU)与 GLSL 内核(opendrt.frag)逐节点等价,用于回归对拍。
+// [EN] Faithfully ported from opendrt_v110.py. Matrix constants are directly copied, formulas and control flow preserved.
+// [ZH] 忠实移植自 opendrt_v110.py。矩阵常数直接复制,公式与控制流原样保留。
+// [EN] CPU reference (evaluateCPU) and GLSL kernel (opendrt.frag) are node-for-node equivalent for regression testing.
+// [ZH] CPU 参考(evaluateCPU)与 GLSL 内核(opendrt.frag)逐节点等价,用于回归对拍。
 //
-// 本步支持 config = Standard look + rec1886 + egamut2 + linear(baseline.json)。
-// 其余枚举字段保留结构,面板可切换 in_gamut/display(cwp 固定 Standard=2)。
+// [EN] This configuration supports standard looks + rec1886 + egamut2 + linear inputs.
+// [ZH] 本步支持 config = Standard look + rec1886 + egamut2 + linear(baseline.json)。
+// [EN] Other enum fields retain their structure, panels can toggle in_gamut/display.
+// [ZH] 其余枚举字段保留结构,面板可切换 in_gamut/display(cwp 固定 Standard=2)。
 
 import type { DrtParams } from "./params";
 import { DISPLAY_ENCODING, IN_OETFS } from "./params";
@@ -12,8 +17,10 @@ import { DISPLAY_ENCODING, IN_OETFS } from "./params";
 export const SQRT3 = 1.73205080756887729353;
 export const PI = 3.14159265358979323846;
 
-// ---- 输入 gamut -> XYZ D65 矩阵(行主序,vdot = M @ v)。直接复制自内核 ----
-// 用于 CPU 参考;GLSL 侧以 column-major uniform 传入(见 gamutMatrixColMajor)。
+// ---- [EN] Input gamut -> XYZ D65 Matrix (row-major, vdot = M @ v). Directly copied from kernel ----
+// ---- [ZH] 输入 gamut -> XYZ D65 矩阵(行主序,vdot = M @ v)。直接复制自内核 ----
+// [EN] Used for CPU reference; passed as column-major uniform to GLSL side (see gamutMatrixColMajor).
+// [ZH] 用于 CPU 参考;GLSL 侧以 column-major uniform 传入(见 gamutMatrixColMajor)。
 type Mat3 = number[][]; // 3 行 x 3 列
 
 export const INPUT_GAMUT_MATRICES: Record<string, Mat3 | null> = {

@@ -1,10 +1,15 @@
 #version 300 es
-// OpenDRT v1.1.0 —— GLSL 内核。忠实移植 opendrt_v110.py 的 _transform() 完整链路。
+// [EN] OpenDRT v1.1.0 - GLSL Kernel. Faithfully ported from opendrt_v110.py _transform() full pipeline.
+// [ZH] OpenDRT v1.1.0 —— GLSL 内核。忠实移植 opendrt_v110.py 的 _transform() 完整链路。
 //
-// 移植忠实性(PORT_SPEC):矩阵常数直接复制自内核;spowf/sdivf/toe 等"奇怪写法"原样保留;
-// 不合并、不改运算顺序。本步支持 config = Standard look + rec1886 + egamut2 + linear。
-// Standard look 固定参数 = LOOK_PRESETS["Standard"](作为 GLSL 常量,直接复制);
-// 求解常数 / display 配置 / in_gamut 矩阵 作为 uniform 传入(TS 侧 solveConstants 复算)。
+// [EN] Port fidelity (PORT_SPEC): Matrix constants copied directly; "weird" patterns like spowf/sdivf/toe preserved;
+// [ZH] 移植忠实性(PORT_SPEC):矩阵常数直接复制自内核;spowf/sdivf/toe 等"奇怪写法"原样保留;
+// [EN] No operations merged or reordered.
+// [ZH] 不合并、不改运算顺序。本步支持 config = Standard look + rec1886 + egamut2 + linear。
+// [EN] Standard look fixed parameters = LOOK_PRESETS["Standard"] (copied as GLSL constants).
+// [ZH] Standard look 固定参数 = LOOK_PRESETS["Standard"](作为 GLSL 常量,直接复制);
+// [EN] Solved constants / display config / in_gamut matrix passed as uniforms (TS solveConstants re-computes them).
+// [ZH] 求解常数 / display 配置 / in_gamut 矩阵 作为 uniform 传入(TS 侧 solveConstants 复算)。
 precision highp float;
 
 in vec2 v_uv;

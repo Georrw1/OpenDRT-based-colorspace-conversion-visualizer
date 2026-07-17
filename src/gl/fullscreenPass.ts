@@ -19,6 +19,10 @@ const UNIFORM_NAMES = [
   "u_in_oetf", "u_inMtx", "u_display_gamut", "u_eotf", "u_cwp", "u_clamp", "u_cwp_norm",
 ];
 
+/**
+ * [EN] Fullscreen quad render pass wrapper
+ * [ZH] 全屏四边形渲染管线封装
+ */
 export class FullscreenPass {
   private gl: WebGL2RenderingContext;
   private prog: Program;
@@ -79,7 +83,10 @@ export class FullscreenPass {
     return tex;
   }
 
-  /** 释放纹理(图像预览换源/换 OETF 时回收旧纹理)。 */
+  /**
+   * [EN] Release texture (recycle old texture when changing source/OETF for image preview).
+   * [ZH] 释放纹理(图像预览换源/换 OETF 时回收旧纹理)。
+   */
   deleteTexture(tex: WebGLTexture) {
     this.gl.deleteTexture(tex);
   }
