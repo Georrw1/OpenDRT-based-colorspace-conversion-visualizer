@@ -68,7 +68,7 @@ function getProbeState(c: ResolvedConfig, probePixel: { x: number; y: number; rg
   return { hue, ach_d, tsn_pt, tsn0, tsn_const };
 }
 
-function updateFormula(mode: string, params: DrtParams) {
+function updateFormula(mode: string) {
   const formulaDiv = document.getElementById("curves-formula");
   if (!formulaDiv) return;
   let latex = "";
@@ -555,11 +555,9 @@ function drawTransfer(ctx: CanvasRenderingContext2D, x0: number, y0: number, w: 
   ctx.strokeStyle = "#5ab4ff";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  let maxLin = 1;
   for (let i = 0; i <= N; i++) {
     const cv = i / N;
     const lin = linearizeScalar(cv, c.in_oetf as any);
-    if (i === N) maxLin = Math.max(1, lin);
     const X = px(cv);
     const Y = py(Math.log2(lin + 1) / 4);
     i === 0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y);
@@ -609,5 +607,5 @@ export function renderCurves(
     drawTransfer(ctx, 0, 0, W, H, params);
   }
 
-  updateFormula(mode, params);
+  updateFormula(mode);
 }
