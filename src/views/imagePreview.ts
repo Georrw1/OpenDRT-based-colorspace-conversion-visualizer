@@ -1,87 +1,298 @@
-// 图像预览主视图:把上传的图像(或内置合成图)解码为 scene-linear,整图应用 OpenDRT。
-// 源 gamut / transform curve(OETF)/ 所有 OpenDRT 参数改动都触发重绘。
-//
-// 【CPU 渲染】原先用 GLSL 渲染到 canvas,但 RGBA32F/RGBA16F 浮点纹理在部分真实 GPU 上
-//   采样后得到全黑(swiftshader 正常、真实 GPU 黑屏)。改为复用已验证与 GLSL 内核 bit 级一致的
-//   CPU evaluateCPU(回归 max abs err ~8e-7)逐像素渲染 → putImageData,跨所有 GPU/环境稳定可靠。
-//   忠实性:数值完全来自 evaluateCPU;SDR 的 OETF 反解码已在 decodeSceneLinear 完成(scene-linear 输入)。
-//
-// 性能:整图在 MAX_VIEW 下采样后逐像素跑内核。自用调试工具,交互可接受;结果缓存按 源+OETF+参数 键。
+// Image preview: CPU OpenDRT evaluation runs in a module worker so range input
+// does not wait for the full-image transform. Dragging uses a smaller source;
+// pointer/keyboard release requests full quality. Only newest queued params run.
 
-import { resolveConfig, evaluateCPU, type ResolvedConfig } from "../drt";
 import type { DrtParams } from "../params";
+import type { RenderQuality } from "../renderQuality";
 import { decodeSceneLinear, type LoadedSource } from "../io/loadImage";
+import { evaluateCPU, resolveConfig } from "../drt";
 
-const MAX_VIEW = 1024; // canvas 最长边(绘制像素上限);CPU 逐像素,较 GLSL 时代略降以保交互
+const FULL_MAX_VIEW = 1024;
+const INTERACTIVE_MAX_VIEW = 256;
 
-// 缓存下采样后的 scene-linear 输入,按「源 + OETF」为键;换源/换曲线才重解码重采样。
-interface LinCache {
-  key: string;
-  w: number;
-  h: number;
-  lin: Float32Array; // RGBA,scene-linear,行0=顶
-}
-let linCache: LinCache | null = null;
-
-function sourceKey(src: LoadedSource, oetf: string): string {
-  return `${src.name}|${src.kind}|${src.width}x${src.height}|${src.isLinear ? "lin" : oetf}`;
+interface LinearLevel {
+  width: number;
+  height: number;
+  linear: Float32Array;
 }
 
-function ensureDownsampled(src: LoadedSource, oetf: string): LinCache {
-  const key = sourceKey(src, oetf);
-  if (linCache && linCache.key === key) return linCache;
-  const full = decodeSceneLinear(src, oetf);
-  const scale = Math.min(1, MAX_VIEW / Math.max(src.width, src.height));
-  const w = Math.max(1, Math.round(src.width * scale));
-  const h = Math.max(1, Math.round(src.height * scale));
-  const lin = new Float32Array(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    const sy = Math.min(src.height - 1, Math.floor((y / h) * src.height));
-    for (let x = 0; x < w; x++) {
-      const sx = Math.min(src.width - 1, Math.floor((x / w) * src.width));
-      const di = (y * w + x) * 4;
-      const si = (sy * src.width + sx) * 4;
-      lin[di] = full[si];
-      lin[di + 1] = full[si + 1];
-      lin[di + 2] = full[si + 2];
-      lin[di + 3] = 1;
+interface SourceCache {
+  source: LoadedSource;
+  oetf: string;
+  sourceId: number;
+  fullWidth: number;
+  fullHeight: number;
+}
+
+interface QueuedRender {
+  requestId: number;
+  sourceId: number;
+  quality: RenderQuality;
+  params: DrtParams;
+  source: LoadedSource;
+  canvas: HTMLCanvasElement;
+}
+
+interface WorkerResult {
+  type: "result";
+  requestId: number;
+  sourceId: number;
+  quality: RenderQuality;
+  width: number;
+  height: number;
+  durationMs: number;
+  pixels: ArrayBuffer;
+}
+
+let worker: Worker | null = null;
+let workerFailed = false;
+let sourceCache: SourceCache | null = null;
+let sourceSequence = 0;
+let requestSequence = 0;
+let latestRequestId = 0;
+let inFlight = false;
+let activeRequest: QueuedRender | null = null;
+let queuedRequest: QueuedRender | null = null;
+let recycledPixels: ArrayBuffer | undefined;
+let stagingCanvas: HTMLCanvasElement | null = null;
+
+function downsample(
+  linear: Float32Array,
+  sourceWidth: number,
+  sourceHeight: number,
+  maxView: number,
+  forceCopy = false,
+): LinearLevel {
+  const scale = Math.min(1, maxView / Math.max(sourceWidth, sourceHeight));
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  if (width === sourceWidth && height === sourceHeight) {
+    return { width, height, linear: forceCopy ? new Float32Array(linear) : linear };
+  }
+
+  const output = new Float32Array(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const sourceY = Math.min(sourceHeight - 1, Math.floor((y / height) * sourceHeight));
+    for (let x = 0; x < width; x++) {
+      const sourceX = Math.min(sourceWidth - 1, Math.floor((x / width) * sourceWidth));
+      const dst = (y * width + x) * 4;
+      const src = (sourceY * sourceWidth + sourceX) * 4;
+      output[dst] = linear[src];
+      output[dst + 1] = linear[src + 1];
+      output[dst + 2] = linear[src + 2];
+      output[dst + 3] = 1;
     }
   }
-  linCache = { key, w, h, lin };
-  return linCache;
+  return { width, height, linear: output };
+}
+
+function ensureWorker(): Worker | null {
+  if (workerFailed) return null;
+  if (worker) return worker;
+  try {
+    worker = new Worker(new URL("../workers/imagePreview.worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = handleWorkerMessage;
+    worker.onerror = handleWorkerError;
+    return worker;
+  } catch {
+    workerFailed = true;
+    return null;
+  }
+}
+
+function ensureSource(source: LoadedSource, oetf: string): SourceCache {
+  if (sourceCache?.source === source && sourceCache.oetf === oetf) return sourceCache;
+
+  const decoded = decodeSceneLinear(source, oetf);
+  const full = downsample(decoded, source.width, source.height, FULL_MAX_VIEW);
+  // Always allocate an independent buffer because both levels are transferred.
+  const interactive = downsample(
+    full.linear,
+    full.width,
+    full.height,
+    INTERACTIVE_MAX_VIEW,
+    true,
+  );
+  const sourceId = ++sourceSequence;
+
+  const activeWorker = ensureWorker();
+  if (activeWorker) {
+    activeWorker.postMessage({
+      type: "source",
+      sourceId,
+      full,
+      interactive,
+    }, [full.linear.buffer, interactive.linear.buffer]);
+  }
+
+  sourceCache = {
+    source,
+    oetf,
+    sourceId,
+    fullWidth: full.width,
+    fullHeight: full.height,
+  };
+  return sourceCache;
+}
+
+function commitResult(
+  request: QueuedRender,
+  result: WorkerResult,
+  backend = "worker",
+): void {
+  const canvas = request.canvas;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  if (!stagingCanvas) stagingCanvas = document.createElement("canvas");
+  stagingCanvas.width = result.width;
+  stagingCanvas.height = result.height;
+  const stagingContext = stagingCanvas.getContext("2d");
+  if (!stagingContext) return;
+
+  const pixels = new Uint8ClampedArray(result.pixels);
+  stagingContext.putImageData(new ImageData(pixels, result.width, result.height), 0, 0);
+  ctx.imageSmoothingEnabled = result.quality === "interactive";
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(stagingCanvas, 0, 0, canvas.width, canvas.height);
+
+  canvas.dataset.renderBackend = backend;
+  canvas.dataset.renderQuality = result.quality;
+  canvas.dataset.workerMs = result.durationMs.toFixed(2);
+  canvas.dataset.renderedRequestId = String(result.requestId);
+  canvas.dispatchEvent(new CustomEvent("opendrt-preview-rendered", {
+    detail: {
+      backend,
+      quality: result.quality,
+      workerMs: result.durationMs,
+      requestId: result.requestId,
+    },
+  }));
+}
+
+function handleWorkerMessage(event: MessageEvent<WorkerResult>): void {
+  const result = event.data;
+  const request = activeRequest;
+  inFlight = false;
+  activeRequest = null;
+
+  if (
+    request
+    && result.requestId === latestRequestId
+    && result.requestId === request.requestId
+    && result.sourceId === sourceCache?.sourceId
+  ) {
+    commitResult(request, result);
+  }
+
+  // putImageData/drawImage copied the pixels, so the buffer can be recycled by
+  // the next worker job instead of allocating a fresh output on every update.
+  recycledPixels = result.pixels;
+  dispatchQueued();
+}
+
+function handleWorkerError(): void {
+  workerFailed = true;
+  worker?.terminate();
+  worker = null;
+  inFlight = false;
+  const fallback = queuedRequest ?? activeRequest;
+  activeRequest = null;
+  queuedRequest = null;
+  recycledPixels = undefined;
+  if (fallback && fallback.requestId === latestRequestId) renderOnMainThread(fallback);
+}
+
+function renderOnMainThread(request: QueuedRender): void {
+  const decoded = decodeSceneLinear(request.source, request.params.inOetf);
+  const maxView = request.quality === "interactive" ? INTERACTIVE_MAX_VIEW : FULL_MAX_VIEW;
+  const level = downsample(decoded, request.source.width, request.source.height, maxView);
+  const started = performance.now();
+  const pixels = new Uint8ClampedArray(level.width * level.height * 4);
+  const config = resolveConfig(request.params);
+  for (let p = 0; p < level.width * level.height; p++) {
+    const i = p * 4;
+    const out = evaluateCPU(config, [level.linear[i], level.linear[i + 1], level.linear[i + 2]]);
+    pixels[i] = Math.round(Math.min(Math.max(out[0], 0), 1) * 255);
+    pixels[i + 1] = Math.round(Math.min(Math.max(out[1], 0), 1) * 255);
+    pixels[i + 2] = Math.round(Math.min(Math.max(out[2], 0), 1) * 255);
+    pixels[i + 3] = 255;
+  }
+  const result: WorkerResult = {
+    type: "result",
+    requestId: request.requestId,
+    sourceId: request.sourceId,
+    quality: request.quality,
+    width: level.width,
+    height: level.height,
+    durationMs: performance.now() - started,
+    pixels: pixels.buffer,
+  };
+  commitResult(request, result, "main-thread-fallback");
+}
+
+function dispatchQueued(): void {
+  if (inFlight || !queuedRequest) return;
+  const request = queuedRequest;
+  queuedRequest = null;
+  const activeWorker = ensureWorker();
+  if (!activeWorker) {
+    renderOnMainThread(request);
+    return;
+  }
+
+  inFlight = true;
+  activeRequest = request;
+  const message = {
+    type: "render",
+    requestId: request.requestId,
+    sourceId: request.sourceId,
+    quality: request.quality,
+    params: request.params,
+    recycle: recycledPixels,
+  };
+  const transfer = recycledPixels ? [recycledPixels] : [];
+  recycledPixels = undefined;
+  activeWorker.postMessage(message, transfer);
 }
 
 /**
- * CPU 渲染整图预览到 2D canvas。evaluateCPU 输出已是显示编码 [0,1](经逆 EOTF),直接 ×255。
- * pass 参数保留以兼容旧签名(现已不用 WebGL 渲染预览)。
+ * Queue an asynchronous preview. Repeated calls replace the queued work with
+ * the newest params; at most one stale worker job can be running.
  */
 export function renderImage(
   canvas: HTMLCanvasElement,
   _pass: unknown,
   params: DrtParams,
   source: LoadedSource,
+  quality: RenderQuality = "final",
 ): void {
-  const ds = ensureDownsampled(source, params.inOetf);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  if (canvas.width !== ds.w) canvas.width = ds.w;
-  if (canvas.height !== ds.h) canvas.height = ds.h;
+  const cached = ensureSource(source, params.inOetf);
+  if (canvas.width !== cached.fullWidth) canvas.width = cached.fullWidth;
+  if (canvas.height !== cached.fullHeight) canvas.height = cached.fullHeight;
 
-  const c: ResolvedConfig = resolveConfig(params);
-  const img = ctx.createImageData(ds.w, ds.h);
-  const d = img.data;
-  for (let p = 0; p < ds.w * ds.h; p++) {
-    const si = p * 4;
-    const out = evaluateCPU(c, [ds.lin[si], ds.lin[si + 1], ds.lin[si + 2]]);
-    d[si + 0] = Math.round(Math.min(Math.max(out[0], 0), 1) * 255);
-    d[si + 1] = Math.round(Math.min(Math.max(out[1], 0), 1) * 255);
-    d[si + 2] = Math.round(Math.min(Math.max(out[2], 0), 1) * 255);
-    d[si + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
+  const requestId = ++requestSequence;
+  latestRequestId = requestId;
+  queuedRequest = {
+    requestId,
+    sourceId: cached.sourceId,
+    quality,
+    params: { ...params },
+    source,
+    canvas,
+  };
+  canvas.dataset.requestedQuality = quality;
+  canvas.dataset.requestedRequestId = String(requestId);
+  dispatchQueued();
 }
 
-/** 兼容旧接口:CPU 渲染无 GPU 纹理需释放。 */
 export function disposeImagePreview(_pass?: unknown): void {
-  linCache = null;
+  worker?.terminate();
+  worker = null;
+  workerFailed = false;
+  sourceCache = null;
+  activeRequest = null;
+  queuedRequest = null;
+  recycledPixels = undefined;
+  inFlight = false;
 }

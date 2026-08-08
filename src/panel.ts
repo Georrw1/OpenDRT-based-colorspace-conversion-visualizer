@@ -8,6 +8,9 @@ import {
   LOOK_PRESETS, TONESCALE_PRESETS, TONESCALE_PRESET_VALUES,
   type DrtParams, type ParamGroup, type LookName, type TonescalePresetName,
 } from "./params";
+import type { RenderQuality } from "./renderQuality";
+
+export type PanelChangeHandler = (quality?: RenderQuality) => void;
 
 // 选 look:把该 look 的 63 个 DrtParams 字段(逐字来自 DCTL)填入 params。
 // 若已选了非 None 的 tonescale preset,再叠加覆盖 11 个 tn_ 参数(DCTL 顺序:先 look 后 tonescale)。
@@ -58,7 +61,7 @@ function makeSelect(
 function appendSelects(
   root: HTMLElement,
   params: DrtParams,
-  onChange: () => void,
+  onChange: PanelChangeHandler,
   enums: Array<[string, readonly string[], keyof DrtParams, Record<string, string>?]>,
 ): void {
   for (const [label, opts, key, labelMap] of enums) {
@@ -75,7 +78,7 @@ function appendSelects(
 export function buildSourcePanel(
   root: HTMLElement,
   params: DrtParams,
-  onChange: () => void,
+  onChange: PanelChangeHandler,
 ): void {
   root.innerHTML = "";
   appendSelects(root, params, onChange, [
@@ -93,7 +96,7 @@ function makeSlider(
   max: number,
   step: number,
   tip: string,
-  onChange: () => void,
+  onChange: PanelChangeHandler,
 ): HTMLElement {
   const wrap = document.createElement("label");
   wrap.className = "field field-slider";
@@ -112,8 +115,10 @@ function makeSlider(
     const v = parseFloat(slider.value);
     (params[key] as number) = v;
     valSpan.textContent = String(v);
-    onChange();
+    onChange("interactive");
   });
+  // Pointer/keyboard interaction finished: request one full-quality result.
+  slider.addEventListener("change", () => onChange("final"));
   wrap.append(span, slider);
   return wrap;
 }
@@ -124,7 +129,7 @@ function makeToggle(
   key: keyof DrtParams,
   label: string,
   tip: string,
-  onChange: () => void,
+  onChange: PanelChangeHandler,
 ): HTMLElement {
   const wrap = document.createElement("label");
   wrap.className = "field field-toggle";
@@ -147,7 +152,7 @@ function renderGroup(
   root: HTMLElement,
   g: ParamGroup,
   params: DrtParams,
-  onChange: () => void,
+  onChange: PanelChangeHandler,
   afterHeader?: (details: HTMLElement) => void,
 ): void {
   const details = document.createElement("details");
@@ -190,7 +195,7 @@ function renderGroup(
 export function buildOpenDrtPanel(
   root: HTMLElement,
   params: DrtParams,
-  onChange: () => void,
+  onChange: PanelChangeHandler,
   rebuild: () => void,
 ): void {
   root.innerHTML = "";
