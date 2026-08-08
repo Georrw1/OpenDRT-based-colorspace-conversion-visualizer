@@ -7,6 +7,7 @@
 
 import { DEFAULT_PARAMS, type DrtParams } from "./params";
 import { buildSourcePanel, buildOpenDrtPanel } from "./panel";
+import type { RenderQuality } from "./renderQuality";
 import { setLang, getLang, t, updateDomTranslations } from "./locales/i18n";
 import { createGLContext, type GLContext } from "./gl/context";
 import { FullscreenPass } from "./gl/fullscreenPass";
@@ -194,7 +195,7 @@ function getDagDownsampled(): { w: number; h: number; lin: Float32Array } {
   return dagImgCache;
 }
 
-function rerenderDag() {
+function rerenderDag(quality: RenderQuality = "final") {
   const trace = computeProbeTrace(params, probePixel?.rgb);
   const totalH = renderDag(dagCanvas, trace, dagState);
   if (dagCanvas.height !== totalH) dagCanvas.height = totalH;
@@ -202,12 +203,16 @@ function rerenderDag() {
   renderDag(dagCanvas, trace, dagState);
   const idx = dagState.selectedIndex ?? dagState.hoverIndex;
   renderDagInfoPanel(dagInfo, trace, idx, probePixel?.rgb ?? null);
-  // 右侧「整图中间态」:整张(降采样)图跑到该节点后的样子。
-  const ds = getDagDownsampled();
-  renderNodeImage(dagImage, ds.lin, ds.w, ds.h, params, idx);
+  // The 25-stage whole-image trace is intentionally deferred until release.
+  // During drag the graph/probe still updates, but the ~200ms image pass does not
+  // block pointer feedback on the main thread.
+  if (quality === "final") {
+    const ds = getDagDownsampled();
+    renderNodeImage(dagImage, ds.lin, ds.w, ds.h, params, idx);
+  }
 }
 
-function rerender() {
+function rerender(quality: RenderQuality = "final") {
   // glError 仅与回归页相关(GLSL 只用于回归);其他页不因 WebGL 初始化警告而报错。
   const showErr = glError && activeTab === "regression";
   errBox.textContent = showErr ? glError : "";
@@ -220,11 +225,11 @@ function rerender() {
   } else if (activeTab === "curves") {
     renderCurves(curvesCanvas, params, curvesMode, probePixel);
   } else if (activeTab === "dag") {
-    rerenderDag();
+    rerenderDag(quality);
   } else if (activeTab === "gamut3d") {
     rerenderGamut3d();
   } else {
-    renderImage(glCanvas, pass, params, source);
+    renderImage(glCanvas, pass, params, source, quality);
     syncProbeOverlaySize();
     if (probePixel) {
       const dispX = ((probePixel.x + 0.5) / source.width) * glCanvas.width;
@@ -236,10 +241,25 @@ function rerender() {
   }
 }
 
-buildSourcePanel(sourceRoot, params, rerender);
+// Range inputs can emit far more often than the display refresh rate. Merge all
+// changes in the same frame; a final request always supersedes interactive work.
+let renderFrame: number | null = null;
+let pendingQuality: RenderQuality | null = null;
+function requestRerender(quality: RenderQuality = "final") {
+  if (quality === "final" || pendingQuality === null) pendingQuality = quality;
+  if (renderFrame !== null) return;
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = null;
+    const nextQuality = pendingQuality ?? "final";
+    pendingQuality = null;
+    rerender(nextQuality);
+  });
+}
+
+buildSourcePanel(sourceRoot, params, requestRerender);
 // 选 look / tonescale preset 会改所有滑块值，需重建面板 DOM 以反映新值。
 function rebuildOpenDrtPanel(): void {
-  buildOpenDrtPanel(opendrtRoot, params, rerender, rebuildOpenDrtPanel);
+  buildOpenDrtPanel(opendrtRoot, params, requestRerender, rebuildOpenDrtPanel);
 }
 rebuildOpenDrtPanel();
 updateImgInfo();
@@ -404,8 +424,8 @@ const langBtn = document.getElementById("lang-btn")!;
 function rerenderAllComponents() {
   if (pass) {
     void renderRegression(regDiv, pass);
-    renderImage(glCanvas, pass, params, source);
   }
+  renderImage(glCanvas, pass, params, source, "final");
   renderCie(cieCanvas, params, source, { mode: cieMode, showPtw: ciePtw });
   renderCurves(curvesCanvas, params, curvesMode, probePixel);
   rerenderDag();
